@@ -45,7 +45,7 @@ export const Landing: React.FC = () => {
       {/* Hidden Logo Background */}
       <Box
         component="img"
-        src="/src/public/image.png"
+        src="/image.png"
         alt=""
         sx={{
           position: 'absolute',

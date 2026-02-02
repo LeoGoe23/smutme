@@ -76,7 +76,7 @@ export const Header: React.FC = () => {
             <Link to="/" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '12px' }}>
               <Box
                 component="img"
-                src="/src/public/image.png"
+                src="/image.png"
                 alt="Smut.me"
                 sx={{
                   height: { xs: 32, sm: 40 },
