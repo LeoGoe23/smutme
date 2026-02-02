@@ -4,8 +4,12 @@ import { getExampleForTags } from './storyExamples';
 // CONFIGURATION
 // ============================================================================
 
-const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY as string;
-const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+// Use Netlify function in production, direct API in development
+const isDevelopment = window.location.hostname === 'localhost';
+const OPENROUTER_API_KEY = isDevelopment ? (import.meta.env.VITE_OPENROUTER_API_KEY as string) : '';
+const OPENROUTER_API_URL = isDevelopment 
+  ? 'https://openrouter.ai/api/v1/chat/completions'
+  : '/.netlify/functions/generate-story';
 
 const TAG_EXTRACTION_MODEL = 'mistralai/mistral-small-creative';
 const DEFAULT_STORY_MODEL = 'mistralai/mistral-small-creative';
@@ -52,14 +56,20 @@ export interface GenerateStoryResponse {
  */
 async function extractTagsFromPrompt(prompt: string): Promise<string[]> {
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Only add Authorization in development (direct OpenRouter call)
+    if (isDevelopment) {
+      headers['Authorization'] = `Bearer ${OPENROUTER_API_KEY}`;
+      headers['HTTP-Referer'] = window.location.origin;
+      headers['X-Title'] = 'Smut.me';
+    }
+    
     const response = await fetch(OPENROUTER_API_URL, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'Smut.me',
-      },
+      headers,
       body: JSON.stringify({
         model: TAG_EXTRACTION_MODEL,
         response_format: { type: "json_object" },
@@ -355,14 +365,20 @@ export async function generateStory(params: GenerateStoryParams): Promise<Genera
   }
 
   // Step 4: Generate story
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  
+  // Only add Authorization in development (direct OpenRouter call)
+  if (isDevelopment) {
+    headers['Authorization'] = `Bearer ${OPENROUTER_API_KEY}`;
+    headers['HTTP-Referer'] = window.location.origin;
+    headers['X-Title'] = 'Smut.me';
+  }
+  
   const response = await fetch(OPENROUTER_API_URL, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': window.location.origin,
-      'X-Title': 'Smut.me',
-    },
+    headers,
     body: JSON.stringify({
       model: model,
       response_format: { type: "json_object" },
