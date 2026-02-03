@@ -327,7 +327,8 @@ function calculateCost(model: string, promptTokens: number, completionTokens: nu
 export async function generateStory(params: GenerateStoryParams): Promise<GenerateStoryResponse> {
   const { prompt, model = DEFAULT_STORY_MODEL, useExample = true } = params;
 
-  if (!OPENROUTER_API_KEY) {
+  // Only check API key in development (production uses Netlify function)
+  if (isDevelopment && !OPENROUTER_API_KEY) {
     throw new Error('OpenRouter API key is not configured');
   }
 
