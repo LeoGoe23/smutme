@@ -25,6 +25,16 @@ export const handler: Handler = async (event) => {
     };
   }
 
+  // Check if API key is configured
+  if (!OPENROUTER_API_KEY) {
+    console.error('OPENROUTER_API_KEY is not set in environment variables');
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'OpenRouter API key is not configured' }),
+    };
+  }
+
   try {
     const body = JSON.parse(event.body || '{}');
 
