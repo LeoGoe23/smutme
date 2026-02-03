@@ -34,22 +34,21 @@ export const useSessionTracking = () => {
   const { currentUser } = useAuth();
   const location = useLocation();
   
-  // Persist sessionId across reloads using localStorage
+  // Persist sessionId across reloads using sessionStorage (not localStorage)
   const getOrCreateSessionId = () => {
-    const stored = localStorage.getItem('sessionId');
-    const storedTime = localStorage.getItem('sessionStartTime');
-    const now = Date.now();
+    // Use sessionStorage instead of localStorage - clears when tab closes
+    const stored = sessionStorage.getItem('sessionId');
+    const storedTime = sessionStorage.getItem('sessionStartTime');
     
-    // If session is older than 30 minutes, create new session
-    if (stored && storedTime && (now - parseInt(storedTime)) < 30 * 60 * 1000) {
+    if (stored && storedTime) {
       return { sessionId: stored, sessionStart: parseInt(storedTime) };
     }
     
-    // Create new session
+    // Create new session only when truly new
     const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    localStorage.setItem('sessionId', newSessionId);
-    localStorage.setItem('sessionStartTime', now.toString());
-    return { sessionId: newSessionId, sessionStart: now };
+    sessionStorage.setItem('sessionId', newSessionId);
+    sessionStorage.setItem('sessionStartTime', Date.now().toString());
+    return { sessionId: newSessionId, sessionStart: Date.now() };
   };
   
   const { sessionId, sessionStart } = getOrCreateSessionId();
@@ -96,9 +95,16 @@ export const useSessionTracking = () => {
       const duration = Math.floor((now - sessionStartRef.current) / 1000); // seconds
       const timeSinceLastActivity = Math.floor((now - lastActivityRef.current) / 1000);
 
-      // Only save if user was active in last 5 minutes
+      // Only save if:
+      // 1. User was active in last 5 minutes
+      // 2. Session duration is at least 10 seconds (avoid spam)
       if (timeSinceLastActivity > 300) {
         if (window.location.hostname === 'localhost') console.log('⏸️ Session inactive, not saving');
+        return;
+      }
+      
+      if (duration < 10) {
+        if (window.location.hostname === 'localhost') console.log('⏸️ Session too short, waiting...');
         return;
       }
 
@@ -116,32 +122,33 @@ export const useSessionTracking = () => {
           isGuest: !currentUser,
           startTime: new Date(sessionStartRef.current).toISOString(),
           lastActivity: new Date(lastActivityRef.current).toISOString(),
-          duration: duration,
+          durationSeconds: duration,
+          durationMinutes: Math.floor(duration / 60),
           pagesVisited: pagesVisitedRef.current,
           pageCount: pagesVisitedRef.current.length,
           reloadCount: reloadCountRef.current,
-          prompts: [], // Initialize empty prompts array
           timestamp: new Date().toISOString(),
           date: today,
           status: 'active',
         }, { merge: true }); // Merge to update existing doc
         
         if (window.location.hostname === 'localhost') {
-          console.log('📊 Session updated:', duration, 'seconds,', reloadCountRef.current, 'reloads');
+          console.log('📊 Session updated:', Math.floor(duration / 60), 'min', reloadCountRef.current, 'reloads');
         }
       } catch (error) {
         if (window.location.hostname === 'localhost') console.warn('Failed to track session:', error);
       }
     };
 
-    // Initial save
-    saveSession();
+    // Save after 10 seconds first time
+    const initialTimeout = setTimeout(saveSession, 10000);
 
-    // Update session every 2 minutes
+    // Then update every 2 minutes
     trackingIntervalRef.current = setInterval(saveSession, 120000);
 
     // Save on unmount
     return () => {
+      clearTimeout(initialTimeout);
       if (trackingIntervalRef.current) {
         clearInterval(trackingIntervalRef.current);
       }
@@ -155,13 +162,17 @@ export const useSessionTracking = () => {
       const now = Date.now();
       const duration = Math.floor((now - sessionStartRef.current) / 1000);
 
+      // Only save if session was at least 10 seconds
+      if (duration < 10) return;
+
       // Try to update session status to 'ended'
       try {
         const sessionDocRef = doc(db, 'analytics', sessionIdRef.current);
         await setDoc(sessionDocRef, {
           status: 'ended',
           endTime: new Date(now).toISOString(),
-          duration: duration,
+          durationSeconds: duration,
+          durationMinutes: Math.floor(duration / 60),
           timestamp: new Date().toISOString(),
         }, { merge: true });
       } catch (error) {
@@ -169,13 +180,7 @@ export const useSessionTracking = () => {
       }
 
       if (window.location.hostname === 'localhost') {
-        console.log('📊 Session ended:', duration, 'seconds');
-      }
-      
-      // Clear localStorage on actual exit (not reload)
-      if (performance.navigation.type !== 1) {
-        localStorage.removeItem('sessionId');
-        localStorage.removeItem('sessionStartTime');
+        console.log('📊 Session ended:', Math.floor(duration / 60), 'minutes');
       }
     };
 
